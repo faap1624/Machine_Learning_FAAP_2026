@@ -1,75 +1,99 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 
-# Configuración inicial de la página
+# ---------------------------------------------------------
+# CONFIGURACIÓN DE LA PÁGINA
+# ---------------------------------------------------------
 st.set_page_config(
-    page_title="Analizador de Datos con Streamlit",
+    page_title="Dashboard Analítico Avanzado",
     page_icon="📊",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-st.title("📊 Analizador y Visor de Datos Dinámico")
-st.markdown("Sube tu archivo **CSV** o **Excel** para explorar métricas, consultar la estructura de los datos y generar visualizaciones al instante.")
+st.title("📊 Dashboard Analítico Avanzado")
+st.markdown("Explora métricas, aplica **filtros dinámicos multinivel** y analiza múltiples proyecciones interactivas.")
 
-# --- BARRA LATERAL: CARGA DE ARCHIVOS ---
-st.sidebar.header("📁 1. Carga de Archivos")
-uploaded_file = st.sidebar.file_uploader(
-    "Selecciona un archivo de datos", 
-    type=["csv", "xlsx", "xls"]
-)
+# ---------------------------------------------------------
+# GENERACIÓN / CARGA DE DATOS
+# ---------------------------------------------------------
+@st.cache_data
+def generar_datos_prueba():
+    np.random.seed(42)
+    n = 500
+    fechas = pd.date_range(start="2026-01-01", periods=n, freq="D")
+    regiones = ["Norte", "Centro", "Sur", "Occidente"]
+    categorias = ["Electrónica", "Servicios", "Industrial", "Software"]
+    vendedores = ["Ana", "Carlos", "Diana", "Eduardo", "Sofía"]
+    
+    df = pd.DataFrame({
+        "Fecha": np.random.choice(fechas, size=n),
+        "Region": np.random.choice(regiones, size=n, p=[0.3, 0.3, 0.2, 0.2]),
+        "Categoria": np.random.choice(categorias, size=n),
+        "Vendedor": np.random.choice(vendedores, size=n),
+        "Ventas_USD": np.random.uniform(500, 15000, size=n).round(2),
+        "Costos_USD": np.random.uniform(200, 8000, size=n).round(2),
+        "Satisfaccion_Cliente": np.random.uniform(1.0, 5.0, size=n).round(1),
+        "Unidades_Vendidas": np.random.randint(1, 50, size=n)
+    })
+    df["Ganancia_USD"] = (df["Ventas_USD"] - df["Costos_USD"]).round(2)
+    df["Margen_%"] = ((df["Ganancia_USD"] / df["Ventas_USD"]) * 100).round(2)
+    return df.sort_values("Fecha").reset_index(drop=True)
 
-if uploaded_file is not None:
-    try:
-        # Detectar el tipo de archivo y leerlo con Pandas
-        if uploaded_file.name.endswith('.csv'):
-            df = pd.read_csv(uploaded_file)
-        else:
-            df = pd.read_excel(uploaded_file)
-        
-        st.sidebar.success(f"¡Archivo **{uploaded_file.name}** cargado con éxito!")
+# Barra lateral: Opción de carga de archivo propio o dataset demo
+st.sidebar.header("📁 Carga de Datos")
+fuente_datos = st.sidebar.radio("Origen de datos:", ["Dataset de Ejemplo (Demo)", "Subir archivo propio (CSV/Excel)"])
 
-        # --- MÉTRICAS GENERALES ---
-        st.subheader("📌 Resumen General")
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Total de Filas", f"{df.shape[0]:,}")
-        col2.metric("Total de Columnas", df.shape[1])
-        col3.metric("Valores Nulos Totales", int(df.isna().sum().sum()))
-
-        # --- VISTA PREVIA DEL DATAFRAME ---
-        with st.expander("🔍 Vista previa de los datos (DataFrame)"):
-            st.dataframe(df, use_container_width=True)
-
-        # --- ESTADÍSTICAS DESCRIPTIVAS ---
-        with st.expander("📈 Estadísticas Descriptivas"):
-            st.write(df.describe())
-
-        # --- VISUALIZACIÓN RÁPIDA CON PLOTLY ---
-        st.markdown("---")
-        st.subheader("📈 Generador de Gráficos Interactivos")
-        
-        numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
-        all_cols = df.columns.tolist()
-
-        if len(numeric_cols) >= 1 and len(all_cols) >= 2:
-            col_x = st.selectbox("Selecciona la variable para el Eje X", all_cols, index=0)
-            col_y = st.selectbox("Selecciona la variable numérica para el Eje Y", numeric_cols, index=0)
-            color_col = st.selectbox("Agrupar por color (Opcional)", [None] + all_cols)
-
-            # Gráfico de dispersión o líneas según convenga
-            fig = px.scatter(
-                df, 
-                x=col_x, 
-                y=col_y, 
-                color=color_col, 
-                title=f"Relación de {col_y} vs {col_x}",
-                template="plotly_white"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.warning("El dataset necesita al menos una columna numérica para generar gráficos.")
-
-    except Exception as e:
-        st.error(f"Ocurrió un error al procesar el archivo: {e}")
+if fuente_datos == "Subir archivo propio (CSV/Excel)":
+    uploaded_file = st.sidebar.file_uploader("Selecciona archivo", type=["csv", "xlsx", "xls"])
+    if uploaded_file is not None:
+        try:
+            if uploaded_file.name.endswith('.csv'):
+                df_raw = pd.read_csv(uploaded_file)
+            else:
+                df_raw = pd.read_excel(uploaded_file)
+            st.sidebar.success(f"¡{uploaded_file.name} cargado correctamente!")
+        except Exception as e:
+            st.error(f"Error al leer archivo: {e}")
+            st.stop()
+    else:
+        st.info("👈 Sube un archivo en la barra lateral para continuar o selecciona 'Dataset de Ejemplo'.")
+        st.stop()
 else:
-    st.info("👈 Utiliza la barra lateral para cargar un archivo CSV o Excel y comenzar.")
+    df_raw = generar_datos_prueba()
+
+# ---------------------------------------------------------
+# FILTROS AVANZADOS EN LA BARRA LATERAL
+# ---------------------------------------------------------
+st.sidebar.markdown("---")
+st.sidebar.header("🎛️ Filtros Avanzados")
+
+df_filtered = df_raw.copy()
+
+# Detectar columnas categóricas y de fecha
+columnas_texto = df_filtered.select_dtypes(include=['object', 'category']).columns.tolist()
+columnas_num = df_filtered.select_dtypes(include=['float64', 'int64']).columns.tolist()
+columnas_fecha = df_filtered.select_dtypes(include=['datetime64[ns]', 'datetime64']).columns.tolist()
+
+# Si hay fechas, agregar filtro de rango temporal
+if columnas_fecha:
+    col_fecha = columnas_fecha[0]
+    min_date = df_filtered[col_fecha].min().date()
+    max_date = df_filtered[col_fecha].max().date()
+    rango_fecha = st.sidebar.date_input(
+        f"Rango de {col_fecha}",
+        value=(min_date, max_date),
+        min_value=min_date,
+        max_value=max_date
+    )
+    if len(rango_fecha) == 2:
+        df_filtered = df_filtered[
+            (df_filtered[col_fecha].dt.date >= rango_fecha[0]) & 
+            (df_filtered[col_fecha].dt.date <= rango_fecha[1])
+        ]
+
+# Filtros dinámicos multinivel para variables categóricas
+for col in columnas_texto:
