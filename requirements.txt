@@ -1,7 +1,7 @@
 streamlit
 pandas
-plotly
-openpyxl
-joblib
 numpy
-os
+scikit-learn
+xgboost
+imbalanced-learn
+joblib
