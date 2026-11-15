@@ -1,0 +1,5 @@
+,Accuracy Global (%),Precision Falla (%),Recall (Acierto Falla) (%),F1-Score (%),PR-AUC (%)
+XGBoost (con SMOTE previo),99.41,73.63,65.69,69.43,71.13
+Random Forest (con SMOTE previo),99.52,80.68,69.61,74.74,75.5
+Pipeline (SMOTE + RF),97.41,25.85,82.35,39.34,65.77
+Balanced Random Forest,95.08,16.26,92.16,27.65,63.89
